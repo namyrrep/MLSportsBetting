@@ -1,0 +1,16 @@
+pandas==2.3.3
+numpy==2.3.3
+scikit-learn==1.7.2
+requests==2.32.5
+beautifulsoup4==4.14.2
+matplotlib==3.10.6
+seaborn==0.13.2
+plotly==6.3.1
+xgboost==3.0.5
+lightgbm==4.6.0
+joblib==1.5.2
+python-dateutil==2.9.0.post0
+tqdm==4.67.1
+nfl-data-py==0.3.0
+fastapi==0.115.2
+uvicorn[standard]==0.30.6

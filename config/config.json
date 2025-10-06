@@ -1,0 +1,43 @@
+{
+    "database": {
+        "path": "data/nfl_games.db",
+        "backup_path": "data/backups/"
+    },
+    "data_collection": {
+        "api_rate_limit": 1.0,
+        "max_retries": 3,
+        "timeout": 30,
+        "start_year": 2018,
+        "current_season": 2024
+    },
+    "feature_engineering": {
+        "lookback_games": 10,
+        "rolling_window": 5,
+        "min_games_for_stats": 3
+    },
+    "model_training": {
+        "test_size": 0.2,
+        "validation_size": 0.2,
+        "cross_validation_folds": 5,
+        "min_training_samples": 100,
+        "retrain_frequency_days": 7,
+        "model_save_path": "data/models/"
+    },
+    "prediction": {
+        "confidence_threshold": 0.6,
+        "ensemble_method": "average",
+        "include_probabilities": true
+    },
+    "logging": {
+        "level": "INFO",
+        "file": "logs/nfl_agent.log",
+        "max_size_mb": 100,
+        "backup_count": 5
+    },
+    "nfl_teams": [
+        "ARI", "ATL", "BAL", "BUF", "CAR", "CHI", "CIN", "CLE",
+        "DAL", "DEN", "DET", "GB", "HOU", "IND", "JAX", "KC",
+        "LV", "LAC", "LAR", "MIA", "MIN", "NE", "NO", "NYG",
+        "NYJ", "PHI", "PIT", "SF", "SEA", "TB", "TEN", "WAS"
+    ]
+}
