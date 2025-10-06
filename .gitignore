@@ -1,0 +1,46 @@
+# Python artifacts
+__pycache__/
+*.py[cod]
+*.pyo
+*.pyd
+*.so
+*.egg-info/
+.eggs/
+build/
+dist/
+
+# Virtual environments
+.env
+.venv
+.env.local
+venv/
+ENV/
+env/
+
+# Logs and coverage
+*.log
+coverage.xml
+htmlcov/
+.coverage*
+pytest_cache/
+.cache/
+
+# Node / frontend assets
+node_modules/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+frontend/dist/
+frontend/node_modules/
+
+# IDE / editor
+.vscode/
+.idea/
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# Local data snapshots (remove if you intend to version them)
+data/
