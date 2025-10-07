@@ -3,7 +3,10 @@ import numpy as np
 from typing import Dict, List, Any, Tuple
 from sklearn.preprocessing import StandardScaler, LabelEncoder
 import logging
-from src.enhanced_features import add_all_enhanced_features
+try:
+    from src.enhanced_features import add_all_enhanced_features
+except ImportError:
+    from enhanced_features import add_all_enhanced_features
 
 logger = logging.getLogger(__name__)
 

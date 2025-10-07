@@ -48,8 +48,8 @@ def collect_historical_seasons():
                     
                     # Store games in database
                     for game in games:
-                        game_id = db.store_game(game)
-                        if game_id:
+                        success = db.insert_game(game)
+                        if success:
                             total_games_collected += 1
                             logger.info(f"  ✓ Stored: {game['away_team']} @ {game['home_team']}")
                 else:

@@ -101,6 +101,42 @@ class DatabaseManager:
                 )
             ''')
             
+            # Model training history table
+            cursor.execute('''
+                CREATE TABLE IF NOT EXISTS model_training_history (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    model_name TEXT NOT NULL,
+                    training_date TEXT DEFAULT CURRENT_TIMESTAMP,
+                    training_samples INTEGER,
+                    test_samples INTEGER,
+                    train_accuracy REAL,
+                    test_accuracy REAL,
+                    precision_score REAL,
+                    recall_score REAL,
+                    f1_score REAL,
+                    roc_auc REAL,
+                    training_duration_seconds REAL,
+                    hyperparameters TEXT,
+                    feature_count INTEGER,
+                    model_version TEXT
+                )
+            ''')
+            
+            # Model metadata table
+            cursor.execute('''
+                CREATE TABLE IF NOT EXISTS model_metadata (
+                    model_name TEXT PRIMARY KEY,
+                    total_training_count INTEGER DEFAULT 0,
+                    first_trained_date TEXT,
+                    last_trained_date TEXT,
+                    best_accuracy REAL DEFAULT 0.0,
+                    current_version TEXT,
+                    is_active BOOLEAN DEFAULT 1,
+                    created_at TEXT DEFAULT CURRENT_TIMESTAMP,
+                    updated_at TEXT DEFAULT CURRENT_TIMESTAMP
+                )
+            ''')
+            
             conn.commit()
             logger.info("Database initialized successfully")
     
@@ -605,6 +641,100 @@ class DatabaseManager:
             )
 
         return breakdown
+
+    def log_model_training(self, training_data: Dict[str, Any]) -> bool:
+        """Log a model training session."""
+        try:
+            with sqlite3.connect(self.db_path) as conn:
+                cursor = conn.cursor()
+                
+                cursor.execute('''
+                    INSERT INTO model_training_history (
+                        model_name, training_samples, test_samples, train_accuracy,
+                        test_accuracy, precision_score, recall_score, f1_score, 
+                        roc_auc, training_duration_seconds, hyperparameters, 
+                        feature_count, model_version
+                    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                ''', (
+                    training_data.get('model_name'),
+                    training_data.get('training_samples'),
+                    training_data.get('test_samples'),
+                    training_data.get('train_accuracy'),
+                    training_data.get('test_accuracy'),
+                    training_data.get('precision_score'),
+                    training_data.get('recall_score'),
+                    training_data.get('f1_score'),
+                    training_data.get('roc_auc'),
+                    training_data.get('training_duration_seconds'),
+                    training_data.get('hyperparameters'),
+                    training_data.get('feature_count'),
+                    training_data.get('model_version', '1.0')
+                ))
+                
+                # Update model metadata
+                cursor.execute('''
+                    INSERT INTO model_metadata (
+                        model_name, total_training_count, first_trained_date, 
+                        last_trained_date, best_accuracy, current_version
+                    ) VALUES (?, 1, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP, ?, ?)
+                    ON CONFLICT(model_name) DO UPDATE SET
+                        total_training_count = total_training_count + 1,
+                        last_trained_date = CURRENT_TIMESTAMP,
+                        best_accuracy = MAX(best_accuracy, ?),
+                        current_version = ?,
+                        updated_at = CURRENT_TIMESTAMP
+                ''', (
+                    training_data.get('model_name'),
+                    training_data.get('test_accuracy', 0.0),
+                    training_data.get('model_version', '1.0'),
+                    training_data.get('test_accuracy', 0.0),
+                    training_data.get('model_version', '1.0')
+                ))
+                
+                conn.commit()
+                return True
+        except Exception as e:
+            logger.error(f"Error logging training: {e}")
+            return False
+    
+    def get_model_training_history(self, model_name: Optional[str] = None, limit: int = 50) -> List[Dict[str, Any]]:
+        """Get training history for models."""
+        query = "SELECT * FROM model_training_history WHERE 1=1"
+        params = []
+        
+        if model_name:
+            query += " AND model_name = ?"
+            params.append(model_name)
+        
+        query += " ORDER BY training_date DESC LIMIT ?"
+        params.append(limit)
+        
+        with sqlite3.connect(self.db_path) as conn:
+            conn.row_factory = sqlite3.Row
+            cursor = conn.cursor()
+            cursor.execute(query, params)
+            return [dict(row) for row in cursor.fetchall()]
+    
+    def get_all_models_metadata(self) -> List[Dict[str, Any]]:
+        """Get metadata for all models."""
+        with sqlite3.connect(self.db_path) as conn:
+            conn.row_factory = sqlite3.Row
+            cursor = conn.cursor()
+            cursor.execute("SELECT * FROM model_metadata ORDER BY total_training_count DESC")
+            return [dict(row) for row in cursor.fetchall()]
+    
+    def get_model_performance_over_time(self, model_name: str) -> List[Dict[str, Any]]:
+        """Get performance metrics over time for a model."""
+        with sqlite3.connect(self.db_path) as conn:
+            conn.row_factory = sqlite3.Row
+            cursor = conn.cursor()
+            cursor.execute('''
+                SELECT training_date, test_accuracy, f1_score, roc_auc, training_samples
+                FROM model_training_history
+                WHERE model_name = ?
+                ORDER BY training_date ASC
+            ''', (model_name,))
+            return [dict(row) for row in cursor.fetchall()]
 
     def get_recent_prediction_outcomes(self, limit: int = 12) -> list[dict[str, Any]]:
         """Return most recent predictions with outcome for streak/recency insights."""

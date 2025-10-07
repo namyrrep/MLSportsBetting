@@ -40,10 +40,16 @@ TEAM_STAR_PLAYERS = {
     "WSH": {"qb": "Jayden Daniels"},
 }
 
-from .database import DatabaseManager
-from .data_collector import DataCollector
-from .feature_engineering import FeatureEngineer
-from .ml_models import MLModelManager
+try:
+    from .database import DatabaseManager
+    from .data_collector import DataCollector
+    from .feature_engineering import FeatureEngineer
+    from .ml_models import MLModelManager
+except ImportError:
+    from database import DatabaseManager
+    from data_collector import DataCollector
+    from feature_engineering import FeatureEngineer
+    from ml_models import MLModelManager
 
 logger = logging.getLogger(__name__)
 

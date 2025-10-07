@@ -13,23 +13,30 @@ import joblib
 import logging
 from typing import Dict, List, Tuple, Any, Optional
 import os
+import time
+import json
+from datetime import datetime
 
 logger = logging.getLogger(__name__)
 
 class MLModelManager:
     """Manages multiple machine learning models for NFL game prediction."""
     
-    def __init__(self, model_save_path: str = "data/models"):
+    def __init__(self, model_save_path: str = "data/models", db_manager=None):
         self.model_save_path = model_save_path
         self.models = {}
         self.scalers = {}
         self.performance_history = {}
+        self.db_manager = db_manager
         
         # Create models directory if it doesn't exist
         os.makedirs(model_save_path, exist_ok=True)
         
         # Initialize models
         self._initialize_models()
+        
+        # Load existing models if available
+        self.load_models()
     
     def _initialize_models(self):
         """Initialize all available models."""
@@ -55,7 +62,9 @@ class MLModelManager:
                 learning_rate=0.1,
                 subsample=0.8,
                 colsample_bytree=0.8,
-                random_state=42
+                random_state=42,
+                verbosity=-1,  # Suppress warnings
+                force_row_wise=True  # Remove threading overhead warning
             ),
             'logistic_regression': LogisticRegression(
                 random_state=42,
@@ -93,6 +102,7 @@ class MLModelManager:
         for model_name, model in self.models.items():
             try:
                 logger.info(f"Training {model_name}...")
+                start_time = time.time()
                 
                 # Prepare data (scale if necessary)
                 X_train_prepared = X_train.copy()
@@ -105,7 +115,11 @@ class MLModelManager:
                 # Train model
                 model.fit(X_train_prepared, y_train)
                 
-                # Make predictions
+                # Calculate train accuracy
+                y_train_pred = model.predict(X_train_prepared)
+                train_accuracy = accuracy_score(y_train, y_train_pred)
+                
+                # Make predictions on test set
                 y_pred = model.predict(X_test_prepared)
                 y_pred_proba = model.predict_proba(X_test_prepared)[:, 1] if hasattr(model, 'predict_proba') else None
                 
@@ -113,10 +127,31 @@ class MLModelManager:
                 metrics = self._calculate_metrics(y_test, y_pred, y_pred_proba)
                 results[model_name] = metrics
                 
+                training_duration = time.time() - start_time
+                
+                # Log training to database
+                if self.db_manager:
+                    training_data = {
+                        'model_name': model_name,
+                        'training_samples': len(X_train),
+                        'test_samples': len(X_test),
+                        'train_accuracy': train_accuracy,
+                        'test_accuracy': metrics['accuracy'],
+                        'precision_score': metrics['precision'],
+                        'recall_score': metrics['recall'],
+                        'f1_score': metrics['f1'],
+                        'roc_auc': metrics.get('roc_auc', 0.5),
+                        'training_duration_seconds': training_duration,
+                        'hyperparameters': json.dumps(model.get_params()),
+                        'feature_count': X.shape[1],
+                        'model_version': '1.0'
+                    }
+                    self.db_manager.log_model_training(training_data)
+                
                 # Save model
                 self._save_model(model_name, model)
                 
-                logger.info(f"{model_name} - Accuracy: {metrics['accuracy']:.4f}")
+                logger.info(f"{model_name} - Accuracy: {metrics['accuracy']:.4f} (trained in {training_duration:.2f}s)")
                 
             except Exception as e:
                 logger.error(f"Error training {model_name}: {e}")

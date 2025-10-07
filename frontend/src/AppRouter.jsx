@@ -15,7 +15,7 @@ function NavLink({ to, children }) {
 
 export default function App() {
   return (
-    <div className="app-container">
+    <div className="app-shell">
       <nav className="app-nav">
         <div className="nav-brand">
           <span className="nav-icon">🏈</span>

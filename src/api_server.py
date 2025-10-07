@@ -12,8 +12,12 @@ import logging
 from fastapi import FastAPI, HTTPException, BackgroundTasks
 from fastapi.middleware.cors import CORSMiddleware
 
-from src.database import DatabaseManager
-from src.feature_engineering import FeatureEngineer
+try:
+    from src.database import DatabaseManager
+    from src.feature_engineering import FeatureEngineer
+except ImportError:
+    from database import DatabaseManager
+    from feature_engineering import FeatureEngineer
 import pandas as pd
 
 logger = logging.getLogger(__name__)
@@ -506,6 +510,88 @@ def refresh_predictions() -> dict:
             "updated_games": updated_count,
             "generated_at": _timestamp()
         }
+    except Exception as exc:
+        raise HTTPException(status_code=500, detail=str(exc)) from exc
+
+
+@app.get("/models/overview")
+def models_overview() -> dict:
+    """Get overview of all models with their metadata and performance."""
+    try:
+        models_metadata = db_manager.get_all_models_metadata()
+        
+        # Enrich with latest predictions accuracy
+        for model in models_metadata:
+            model_name = model['model_name']
+            accuracy = db_manager.get_model_accuracy(model_name)
+            model['current_accuracy'] = accuracy
+        
+        return {
+            "generated_at": _timestamp(),
+            "models": models_metadata,
+            "count": len(models_metadata)
+        }
+    except Exception as exc:
+        raise HTTPException(status_code=500, detail=str(exc)) from exc
+
+
+@app.get("/models/{model_name}/history")
+def model_training_history(model_name: str, limit: int = 20) -> dict:
+    """Get training history for a specific model."""
+    try:
+        history = db_manager.get_model_training_history(model_name, limit=limit)
+        performance_over_time = db_manager.get_model_performance_over_time(model_name)
+        
+        return {
+            "generated_at": _timestamp(),
+            "model_name": model_name,
+            "training_sessions": history,
+            "performance_trend": performance_over_time,
+            "total_sessions": len(history)
+        }
+    except Exception as exc:
+        raise HTTPException(status_code=500, detail=str(exc)) from exc
+
+
+@app.get("/models/{model_name}/stats")
+def model_stats(model_name: str) -> dict:
+    """Get detailed statistics for a specific model."""
+    try:
+        # Get metadata
+        all_models = db_manager.get_all_models_metadata()
+        model_meta = next((m for m in all_models if m['model_name'] == model_name), None)
+        
+        if not model_meta:
+            raise HTTPException(status_code=404, detail=f"Model {model_name} not found")
+        
+        # Get recent training history
+        recent_history = db_manager.get_model_training_history(model_name, limit=10)
+        
+        # Calculate statistics
+        if recent_history:
+            avg_training_time = sum(h.get('training_duration_seconds', 0) for h in recent_history) / len(recent_history)
+            avg_accuracy = sum(h.get('test_accuracy', 0) for h in recent_history) / len(recent_history)
+        else:
+            avg_training_time = 0
+            avg_accuracy = 0
+        
+        # Get current accuracy from predictions
+        current_accuracy = db_manager.get_model_accuracy(model_name)
+        
+        return {
+            "generated_at": _timestamp(),
+            "model_name": model_name,
+            "metadata": model_meta,
+            "statistics": {
+                "current_accuracy": current_accuracy,
+                "avg_training_time_seconds": avg_training_time,
+                "avg_test_accuracy": avg_accuracy,
+                "training_sessions_count": len(recent_history)
+            },
+            "recent_training": recent_history[:5]
+        }
+    except HTTPException:
+        raise
     except Exception as exc:
         raise HTTPException(status_code=500, detail=str(exc)) from exc
 
